@@ -4,14 +4,13 @@ import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../models/api_model.dart';
 import '../services/chat_controller.dart';
-import 'ai_loading_animation.dart';
 import 'streaming_text.dart';
+import 'premium_loading_indicator.dart';
 
 class RealConversationDisplay extends StatefulWidget {
   final ChatController chatController;
   final ScrollController scrollController;
   final bool isListening;
-  final AnimationController glowAnimation;
   final bool showStatusText;
 
   const RealConversationDisplay({
@@ -19,7 +18,6 @@ class RealConversationDisplay extends StatefulWidget {
     required this.chatController,
     required this.scrollController,
     required this.isListening,
-    required this.glowAnimation,
     this.showStatusText = true,
   });
 
@@ -31,6 +29,11 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
     with TickerProviderStateMixin {
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   void dispose() {
     super.dispose();
   }
@@ -39,60 +42,6 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Current API Model indicator
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: widget.chatController.currentApiModel.isFree
-                ? const Color(0xFFE8F5E8)
-                : const Color(0xFFFFF3E0),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.chatController.currentApiModel.isFree
-                  ? const Color(0xFF4CAF50)
-                  : const Color(0xFFFF9800),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                widget.chatController.currentApiModel.isFree
-                    ? Icons.check_circle
-                    : Icons.star,
-                color: widget.chatController.currentApiModel.isFree
-                    ? const Color(0xFF4CAF50)
-                    : const Color(0xFFFF9800),
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${widget.chatController.currentApiModel.displayName} by ${widget.chatController.currentApiModel.provider}',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: widget.chatController.currentApiModel.isFree
-                        ? const Color(0xFF4CAF50)
-                        : const Color(0xFFFF9800),
-                  ),
-                ),
-              ),
-              if (widget.chatController.currentApiModel.isFree)
-                Text(
-                  'FREE',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF4CAF50),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        
         // Mock API status indicator (keep for backward compatibility)
         if (widget.chatController.currentApiModel == ApiModel.mock)
           Container(
@@ -129,61 +78,8 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
             ),
           ),
         
-        // Status section - only show when status text is enabled
+        // Status section - simplified for shared avatar approach
         if (widget.showStatusText) ...[
-          AnimatedBuilder(
-            animation: widget.glowAnimation,
-            builder: (context, child) {
-              return Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFF89A8B2).withOpacity(0.3),
-                      const Color(0xFFB3C8CF).withOpacity(0.2),
-                      Colors.transparent,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF89A8B2).withOpacity(0.15 + widget.glowAnimation.value * 0.25),
-                      blurRadius: 30 + widget.glowAnimation.value * 15,
-                      spreadRadius: 3 + widget.glowAnimation.value * 7,
-                    ),
-                  ],
-                ),
-                child: Container(
-                  margin: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF89A8B2),
-                        Color(0xFFB3C8CF),
-                        Color(0xFFE5E1DA),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.psychology_outlined,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                ),
-              );
-            },
-          ),
           const SizedBox(height: 24),
         ],
         
@@ -199,18 +95,21 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
     return ListenableBuilder(
       listenable: widget.chatController,
       builder: (context, child) {
-        final messages = widget.chatController.messages;
+        // Capture state once to avoid multiple notifications during build
+        final messages = List.from(widget.chatController.messages);
         final isLoading = widget.chatController.isLoading;
         final isStreaming = widget.chatController.isStreaming;
         final error = widget.chatController.error;
 
         print('💬 UI: Messages count: ${messages.length}, isLoading: $isLoading, isStreaming: $isStreaming');
         for (int i = 0; i < messages.length; i++) {
-          print('💬 UI: Message $i: "${messages[i].text}" (isUser: ${messages[i].isUser})');
+          print('💬 UI: Message $i: "${messages[i].text}" (isUser: ${messages[i].isUser}, length: ${messages[i].text.length})');
         }
 
+        // If no messages and not loading, show empty container
+        // The main screen will handle showing the welcome avatar
         if (messages.isEmpty && !isLoading) {
-          return _buildWelcomeMessage();
+          return const SizedBox.expand();
         }
 
         return Column(
@@ -218,13 +117,14 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
             // Error message at the top if present
             if (error != null) _buildErrorMessage(error),
             
-            // Messages list with proper keyboard handling
+            // Messages list with stable key
             Expanded(
               child: ListView.builder(
+                key: const ValueKey('conversation_listview'), // Fixed stable key
                 controller: widget.scrollController,
-                padding: EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   top: 8,
-                  bottom: 8 + MediaQuery.of(context).viewInsets.bottom * 0.1, // Add small padding for keyboard
+                  bottom: 16,
                   left: 0,
                   right: 0,
                 ),
@@ -232,7 +132,10 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                 itemBuilder: (context, index) {
                   if (index >= messages.length) {
                     // Loading indicator
-                    return _buildLoadingMessage();
+                    return Container(
+                      key: ValueKey('loading_$index'),
+                      child: _buildLoadingMessage(),
+                    );
                   }
                   
                   final message = messages[index];
@@ -243,62 +146,6 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
           ],
         );
       },
-    );
-  }
-
-  Widget _buildWelcomeMessage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF89A8B2),
-                  Color(0xFFB3C8CF),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF89A8B2).withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.psychology_outlined,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            "Welcome to Claude Killer!",
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF2C3E50),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "I'm here to help with anything you need.\nWhat would you like to know?",
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              color: const Color(0xFF89A8B2),
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 
@@ -346,44 +193,9 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
   }
 
   Widget _buildLoadingMessage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: Row(
-        children: [
-          // AI consciousness wave animation instead of avatar
-          const AILoadingAnimation(size: 32),
-          const SizedBox(width: 12),
-          // Typing indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFFE5E1DA).withOpacity(0.95),
-                  const Color(0xFFF1F0E8).withOpacity(0.9),
-                ],
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-                bottomLeft: Radius.circular(6),
-              ),
-            ),
-            child: Text(
-              'Just a sec..',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF4A5568),
-                letterSpacing: 0.2,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return PremiumLoadingIndicator(
+      uniqueId: 'conversation_loading',
+      avatarSize: 40.0,
     );
   }
 
@@ -392,6 +204,7 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
     final isStreaming = message.status == MessageStatus.streaming;
     
     return Padding(
+      key: ValueKey('msg_${message.id}_${index}'), // Include index for extra uniqueness
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
       child: Row(
         mainAxisAlignment: message.isUser 
@@ -460,16 +273,52 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                                 letterSpacing: 0.2,
                               ),
                             )
-                          : Text(
-                              message.text,
-                              style: GoogleFonts.inter(
-                                color: const Color(0xFF4A5568),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                height: 1.4,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
+                          : message.text.isNotEmpty
+                              ? WordStreamingText(
+                                  key: ValueKey('stream_${message.id}_${index}'), // Include index for uniqueness
+                                  text: message.text,
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF4A5568),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                    letterSpacing: 0.2,
+                                  ),
+                                  wordDelay: const Duration(milliseconds: 150), // Slower for smoother fade
+                                )
+                              : message.text.isEmpty
+                                ? (isStreaming 
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 4),
+                                        child: Row(
+                                          children: [
+                                            PremiumLoadingIndicator(
+                                              avatarSize: 24.0,
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : Text(
+                                        'No response received',
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFF4A5568).withOpacity(0.6),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.4,
+                                          letterSpacing: 0.2,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ))
+                                : Text(
+                                    message.text,
+                                    style: GoogleFonts.inter(
+                                      color: const Color(0xFF4A5568),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.4,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
                       if (isStreaming) ...[
                         const SizedBox(height: 8),
                         Container(

@@ -8,6 +8,7 @@ import '../widgets/real_conversation_display.dart';
 import '../widgets/audio_visualization.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/multi_model_api_dialog.dart';
+import '../widgets/shared/shared_premium_avatar.dart';
 import '../services/chat_controller.dart';
 import '../constants/app_config.dart';
 import 'settings_screen.dart';
@@ -23,12 +24,14 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     with TickerProviderStateMixin {
   late AnimationController _backgroundController;
   late AnimationController _breathingController;
-  late AnimationController _glowController;
+  late AnimationController _fadeController;
+  // late AnimationController _modelInfoFadeController; // DISABLED - banner functionality turned off
   late ChatController _chatController;
   late ScrollController _scrollController;
   
   bool _isListening = false;
   bool _isVoiceMode = false;
+  // bool _showModelInfo = true; // Show model info banner initially - DISABLED
   final TextEditingController _textController = TextEditingController();
   String _conversationTitle = 'Claude Killer';
 
@@ -45,13 +48,39 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
       vsync: this,
     )..repeat(reverse: true);
     
-    _glowController = AnimationController(
-      duration: const Duration(seconds: 2),
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
       vsync: this,
-    )..repeat(reverse: true);
+    );
+
+    // DISABLED - Banner functionality turned off
+    // _modelInfoFadeController = AnimationController(
+    //   duration: const Duration(milliseconds: 500),
+    //   vsync: this,
+    //   value: 1.0, // Start fully visible
+    // );
     
     _scrollController = ScrollController();
     _chatController = ChatController();
+    
+    // Start fade in animation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fadeController.forward();
+    });
+
+    // DISABLED - Banner fade out functionality
+    // Start model info fade out after 3 seconds
+    // Future.delayed(const Duration(seconds: 3), () {
+    //   if (mounted) {
+    //     _modelInfoFadeController.animateTo(0.0).then((_) {
+    //       if (mounted) {
+    //         setState(() {
+    //           _showModelInfo = false;
+    //         });
+    //       }
+    //     });
+    //   }
+    // });
     
     // Add listener to update send button state
     _textController.addListener(() {
@@ -114,7 +143,8 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
   void dispose() {
     _backgroundController.dispose();
     _breathingController.dispose();
-    _glowController.dispose();
+    _fadeController.dispose();
+    // _modelInfoFadeController.dispose(); // DISABLED - banner functionality turned off
     _scrollController.dispose();
     _textController.dispose();
     _chatController.removeListener(_onChatControllerChanged);
@@ -378,12 +408,17 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+    if (mounted && _scrollController.hasClients) {
+      try {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } catch (e) {
+        // Silently handle scroll controller conflicts
+        print('Scroll controller conflict: $e');
+      }
     }
   }
 
@@ -540,7 +575,155 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
                         ),
                       ),
                       
-                      // Part 1: Status text and AI logo section - Only show in voice mode
+                      // Part 1: Premium Avatar and welcome text - Only show in text mode when no messages
+                      if (!_isVoiceMode && !_chatController.hasMessages) 
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+                              final isKeyboardVisible = keyboardHeight > 0;
+                              final availableHeight = constraints.maxHeight;
+                              
+                              // More defensive layout calculation with keyboard handling
+                              final textHeight = 50.0; // Reserve space for welcome text
+                              final minAvatarSize = 50.0;
+                              final maxAvatarSize = 120.0;
+                              
+                              // When keyboard is visible, use much smaller spacing and avatar
+                              if (isKeyboardVisible || availableHeight < 300) {
+                                final compactAvatarSize = 60.0;
+                                final compactSpacing = 16.0;
+                                final compactTextHeight = 40.0;
+                                
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  child: FadeTransition(
+                                    opacity: _fadeController,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        // Compact top spacing
+                                        SizedBox(height: compactSpacing),
+                                        
+                                        // Compact Premium Avatar
+                                        SharedPremiumAvatar(
+                                          size: compactAvatarSize,
+                                          heroTag: 'premium_avatar',
+                                          showGlow: true,
+                                        ),
+                                        
+                                        // Compact middle spacing
+                                        SizedBox(height: compactSpacing),
+                                        
+                                        // Compact welcome text
+                                        Container(
+                                          constraints: BoxConstraints(
+                                            maxWidth: 280,
+                                            maxHeight: compactTextHeight,
+                                          ),
+                                          child: AnimatedBuilder(
+                                            animation: _fadeController,
+                                            builder: (context, child) {
+                                              return Transform.scale(
+                                                scale: 0.95 + (_fadeController.value * 0.05),
+                                                child: Text(
+                                                  "How can I help you today?",
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 14.0,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: const Color(0xFF4A5568),
+                                                    height: 1.2,
+                                                    letterSpacing: 0.2,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        
+                                        // Compact bottom spacing
+                                        SizedBox(height: compactSpacing),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              
+                              // Normal layout when keyboard is hidden
+                              final availableForAvatar = availableHeight - textHeight - 120; // More padding for spacing
+                              final avatarSize = availableForAvatar.clamp(minAvatarSize, maxAvatarSize);
+                              
+                              // Calculate spacing proportionally
+                              final totalSpacingAvailable = availableHeight - avatarSize - textHeight;
+                              final topSpacing = (totalSpacingAvailable * 0.4).clamp(20.0, 80.0);
+                              final middleSpacing = (totalSpacingAvailable * 0.35).clamp(24.0, 60.0);
+                              final bottomSpacing = (totalSpacingAvailable * 0.25).clamp(20.0, 60.0);
+                              
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: FadeTransition(
+                                  opacity: _fadeController,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      // Top spacing
+                                      SizedBox(height: topSpacing),
+                                      
+                                      // Premium Avatar with optimal sizing
+                                      SharedPremiumAvatar(
+                                        size: avatarSize,
+                                        heroTag: 'premium_avatar',
+                                        showGlow: true,
+                                      ),
+                                      
+                                      // Middle spacing - increased for better visual separation
+                                      SizedBox(height: middleSpacing),
+                                      
+                                      // Welcome text - properly sized and spaced
+                                      Container(
+                                        constraints: BoxConstraints(
+                                          maxWidth: 320,
+                                          maxHeight: textHeight,
+                                        ),
+                                        child: AnimatedBuilder(
+                                          animation: _fadeController,
+                                          builder: (context, child) {
+                                            return Transform.scale(
+                                              scale: 0.95 + (_fadeController.value * 0.05),
+                                              child: Text(
+                                                "How can I help you today?",
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 18.0,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: const Color(0xFF4A5568),
+                                                  height: 1.3,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      
+                                      // Bottom spacing
+                                      SizedBox(height: bottomSpacing),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                      // Part 1 Alternative: Status text and AI logo section - Only show in voice mode
                       if (_isVoiceMode) SizedBox(
                         height: 130, // Reduced height to accommodate header
                         child: Column(
@@ -574,65 +757,17 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
                                 ),
                               ),
                             
-                            // AI Avatar
-                            AnimatedBuilder(
-                              animation: _glowController,
-                              builder: (context, child) {
-                                return Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        const Color(0xFF89A8B2).withOpacity(0.3),
-                                        const Color(0xFFB3C8CF).withOpacity(0.2),
-                                        Colors.transparent,
-                                      ],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF89A8B2).withOpacity(0.2 + _glowController.value * 0.3),
-                                        blurRadius: 25 + _glowController.value * 10,
-                                        spreadRadius: 2 + _glowController.value * 5,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Container(
-                                    margin: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF89A8B2),
-                                          Color(0xFFB3C8CF),
-                                          Color(0xFFE5E1DA),
-                                        ],
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 6),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.psychology_outlined,
-                                      color: Colors.white,
-                                      size: 28,
-                                    ),
-                                  ),
-                                );
-                              },
+                            // Smaller avatar for voice mode
+                            SharedPremiumAvatar(
+                              size: 80.0,
+                              heroTag: 'premium_avatar_voice',
+                              showGlow: _isListening,
                             ),
                           ],
                         ),
                       ),
                       
-                      // Part 2: Conversation area - takes remaining space
+                      // Part 2: Conversation area - always present to maintain scroll controller
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -640,7 +775,6 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
                             chatController: _chatController,
                             scrollController: _scrollController,
                             isListening: _isListening,
-                            glowAnimation: _glowController,
                             showStatusText: false,
                           ),
                         ),
@@ -706,7 +840,6 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
                                       isListening: _isListening,
                                       onToggleListening: _toggleListening,
                                       breathingAnimation: _breathingController,
-                                      glowAnimation: _glowController,
                                     ),
                                   ),
                                 ),
@@ -722,7 +855,11 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
           ),
           
           // Input section outside of the main stack for proper keyboard behavior
-          if (!_isVoiceMode) _buildTextInputSection(),
+          if (!_isVoiceMode) 
+            FadeTransition(
+              opacity: _fadeController,
+              child: _buildTextInputSection(),
+            ),
         ],
       ),
     );

@@ -4,12 +4,13 @@ import '../constants/animation_constants.dart';
 import '../constants/app_config.dart';
 import '../services/greeting_service.dart';
 import '../widgets/animations/advanced_background.dart';
-import '../widgets/animations/premium_avatar.dart';
+import '../widgets/shared/shared_premium_avatar.dart';
 import '../widgets/animations/advanced_changing_text.dart';
 import '../widgets/common/sophisticated_header.dart';
 import '../widgets/common/recent_activity.dart';
 import '../widgets/common/floating_start_button.dart';
 import '../widgets/cards/premium_expertise_cards.dart';
+import '../utils/page_transitions.dart';
 import 'voice_assistant_screen.dart';
 
 class HomepageScreen extends StatefulWidget {
@@ -120,14 +121,13 @@ class _HomepageScreenState extends State<HomepageScreen>
                           pulseController: _pulseController,
                         ),
                         
-                        const SizedBox(height: 50),
+                        const SizedBox(height: 110),
                         
-                        // Premium AI avatar with multiple effects
-                        PremiumAvatar(
-                          buttonController: _buttonController,
-                          shimmerController: _shimmerController,
-                          backgroundController: _backgroundController,
-                          pulseController: _pulseController,
+                        // Premium AI avatar with hero animation
+                        SharedPremiumAvatar(
+                          size: 120.0,
+                          heroTag: 'premium_avatar',
+                          onTap: _navigateToChat,
                         ),
                         
                         const SizedBox(height: 70),
@@ -175,24 +175,9 @@ class _HomepageScreenState extends State<HomepageScreen>
 
   void _navigateToChat() {
     Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const VoiceAssistantUI(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(0.0, 1.0);
-          const end = Offset.zero;
-          const curve = Curves.easeInOutCubic;
-
-          var tween = Tween(begin: begin, end: end).chain(
-            CurveTween(curve: curve),
-          );
-
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 600),
+      FadeWithHeroTransition(
+        page: const VoiceAssistantUI(),
+        heroTag: 'premium_avatar',
       ),
     );
   }

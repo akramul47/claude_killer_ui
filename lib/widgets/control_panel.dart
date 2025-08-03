@@ -5,14 +5,12 @@ class ControlPanel extends StatelessWidget {
   final bool isListening;
   final VoidCallback onToggleListening;
   final AnimationController breathingAnimation;
-  final AnimationController glowAnimation;
 
   const ControlPanel({
     super.key,
     required this.isListening,
     required this.onToggleListening,
     required this.breathingAnimation,
-    required this.glowAnimation,
   });
 
   @override
@@ -30,10 +28,9 @@ class ControlPanel extends StatelessWidget {
         
         // Main recording button
         AnimatedBuilder(
-          animation: Listenable.merge([breathingAnimation, glowAnimation]),
+          animation: breathingAnimation,
           builder: (context, child) {
             final breathScale = 1.0 + (breathingAnimation.value * 0.04);
-            final glowIntensity = 0.15 + glowAnimation.value * 0.25;
             
             return Transform.scale(
               scale: breathScale,
@@ -54,9 +51,9 @@ class ControlPanel extends StatelessWidget {
                     boxShadow: [
                       // Main glow
                       BoxShadow(
-                        color: const Color(0xFF89A8B2).withOpacity(glowIntensity),
-                        blurRadius: 30 + glowAnimation.value * 20,
-                        spreadRadius: 4 + glowAnimation.value * 6,
+                        color: const Color(0xFF89A8B2).withOpacity(0.3),
+                        blurRadius: 40,
+                        spreadRadius: 6,
                       ),
                       // Outer shadow
                       BoxShadow(

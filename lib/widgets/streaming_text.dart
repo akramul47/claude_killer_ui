@@ -63,7 +63,7 @@ class _StreamingTextState extends State<StreamingText>
   }
 }
 
-// Word-by-word streaming text with fade-in effect like Microsoft Copilot
+// Ultra-reliable streaming text with smooth animation
 class WordStreamingText extends StatefulWidget {
   final String text;
   final TextStyle style;
@@ -73,76 +73,133 @@ class WordStreamingText extends StatefulWidget {
     super.key,
     required this.text,
     required this.style,
-    this.wordDelay = const Duration(milliseconds: 80),
+    this.wordDelay = const Duration(milliseconds: 120), // Slower for smoother animation
   });
 
   @override
   State<WordStreamingText> createState() => _WordStreamingTextState();
 }
 
-class _WordStreamingTextState extends State<WordStreamingText>
+class _WordStreamingTextState extends State<WordStreamingText> 
     with SingleTickerProviderStateMixin {
+  String _currentText = '';
   List<String> _words = [];
-  int _visibleWordCount = 0;
-  late AnimationController _controller;
-
+  int _currentWordIndex = 0;
+  bool _isAnimating = false;
+  bool _isAnimationComplete = false;
+  String _lastProcessedText = '';
+  
   @override
   void initState() {
     super.initState();
-    _words = widget.text.split(' ');
-    
-    print('🔤 WordStreamingText: Starting animation for "${widget.text}" (${_words.length} words)');
-    
-    _controller = AnimationController(
-      duration: Duration(
-        milliseconds: _words.length * widget.wordDelay.inMilliseconds,
-      ),
-      vsync: this,
-    );
-
-    _startWordAnimation();
+    _initializeAnimation();
   }
 
-  void _startWordAnimation() {
-    for (int i = 0; i < _words.length; i++) {
-      Future.delayed(Duration(milliseconds: i * widget.wordDelay.inMilliseconds), () {
-        if (mounted) {
-          setState(() {
-            _visibleWordCount = i + 1;
-          });
-        }
+  @override
+  void didUpdateWidget(WordStreamingText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only restart animation if the text has actually changed
+    if (oldWidget.text != widget.text && widget.text.isNotEmpty && widget.text != _lastProcessedText) {
+      _isAnimationComplete = false;
+      _initializeAnimation();
+    }
+  }
+
+  void _initializeAnimation() {
+    if (widget.text.isEmpty) {
+      setState(() {
+        _currentText = '';
+      });
+      return;
+    }
+
+    // If animation is already complete and text hasn't changed, don't restart
+    if (_isAnimationComplete && widget.text == _lastProcessedText) {
+      return;
+    }
+
+    _words = widget.text.split(' ').where((word) => word.isNotEmpty).toList();
+    _currentWordIndex = 0;
+    _currentText = '';
+    _isAnimating = true;
+    _lastProcessedText = widget.text;
+    
+    print('🔤 WordStreamingText: Animating "${widget.text}" (${_words.length} words)');
+    _animateNextWord();
+  }
+
+  void _animateNextWord() {
+    if (!mounted || !_isAnimating || _currentWordIndex >= _words.length) {
+      _isAnimating = false;
+      _isAnimationComplete = true;
+      return;
+    }
+
+    final word = _words[_currentWordIndex];
+    final isFirstWord = _currentWordIndex == 0;
+    final newText = isFirstWord ? word : '$_currentText $word';
+
+    if (mounted) {
+      setState(() {
+        _currentText = newText;
       });
     }
+
+    _currentWordIndex++;
+    
+    // Add slight randomness for more natural feel, but keep it smooth
+    final baseDelay = widget.wordDelay.inMilliseconds;
+    final randomVariation = ((_currentWordIndex % 3) * 10); // Small variation
+    final delay = baseDelay + randomVariation;
+    
+    Future.delayed(Duration(milliseconds: delay), () {
+      if (mounted && _isAnimating) {
+        _animateNextWord();
+      }
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _isAnimating = false;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      children: List.generate(_visibleWordCount, (index) {
-        return TweenAnimationBuilder<double>(
-          key: ValueKey(index),
-          duration: const Duration(milliseconds: 300),
-          tween: Tween(begin: 0.0, end: 1.0),
-          builder: (context, value, child) {
-            return Transform.translate(
-              offset: Offset(0, (1 - value) * 5),
-              child: Opacity(
-                opacity: value,
-                child: Text(
-                  '${_words[index]} ',
-                  style: widget.style,
-                ),
+    // If animation is complete, show the full text without animation for performance
+    if (_isAnimationComplete) {
+      return Text(
+        widget.text,
+        style: widget.style,
+      );
+    }
+
+    // During animation, show the current animated text with smooth effects
+    final displayText = _currentText.isEmpty && widget.text.isNotEmpty 
+        ? '' // Show nothing until animation starts
+        : _currentText;
+        
+    return AnimatedDefaultTextStyle(
+      duration: const Duration(milliseconds: 200),
+      style: widget.style,
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 150),
+        tween: Tween<double>(begin: 0.9, end: 1.0),
+        curve: Curves.easeOutQuart,
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: value,
+            child: Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: Text(
+                displayText,
+                style: widget.style,
               ),
-            );
-          },
-        );
-      }),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -208,6 +265,56 @@ class _FadeInTextState extends State<FadeInText>
         widget.text,
         style: widget.style,
       ),
+    );
+  }
+}
+
+// Simple typewriter effect as backup
+class TypewriterText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final Duration delay;
+
+  const TypewriterText({
+    super.key,
+    required this.text,
+    required this.style,
+    this.delay = const Duration(milliseconds: 50),
+  });
+
+  @override
+  State<TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<TypewriterText> {
+  String _displayText = '';
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTyping();
+  }
+
+  void _startTyping() {
+    if (_currentIndex < widget.text.length) {
+      Future.delayed(widget.delay, () {
+        if (mounted) {
+          setState(() {
+            _currentIndex++;
+            _displayText = widget.text.substring(0, _currentIndex);
+          });
+          _startTyping();
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _displayText,
+      style: widget.style,
     );
   }
 }
