@@ -27,17 +27,25 @@ class AppConfig {
   
   // Development flags
   static const bool isDebugMode = true;
-  static const bool useMockApi = true; // Set to false when using real API
+  static const bool useMockApi = false; // Set to true for development/testing
 }
 
 class ApiKeys {
   static String? _claudeApiKey;
+  static String? _openAIApiKey;
   
   static void setClaudeApiKey(String key) {
     _claudeApiKey = key;
   }
   
-  static String? get claudeApiKey => _claudeApiKey;
+  static void setOpenAIApiKey(String key) {
+    _openAIApiKey = key;
+  }
   
-  static bool get hasApiKey => _claudeApiKey != null && _claudeApiKey!.isNotEmpty;
+  static String? get claudeApiKey => _claudeApiKey;
+  static String? get openAIApiKey => _openAIApiKey;
+  
+  static bool get hasClaudeApiKey => _claudeApiKey != null && _claudeApiKey!.isNotEmpty;
+  static bool get hasOpenAIApiKey => _openAIApiKey != null && _openAIApiKey!.isNotEmpty;
+  static bool get hasApiKey => hasClaudeApiKey || hasOpenAIApiKey;
 }

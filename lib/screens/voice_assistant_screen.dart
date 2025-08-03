@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/floating_particle.dart';
-import '../widgets/conversation_display.dart';
+import '../widgets/real_conversation_display.dart';
 import '../widgets/audio_visualization.dart';
 import '../widgets/control_panel.dart';
+import '../widgets/multi_model_api_dialog.dart';
+import '../services/chat_controller.dart';
+import '../constants/app_config.dart';
+import 'settings_screen.dart';
 
 class VoiceAssistantUI extends StatefulWidget {
   const VoiceAssistantUI({super.key});
@@ -20,9 +24,13 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
   late AnimationController _backgroundController;
   late AnimationController _breathingController;
   late AnimationController _glowController;
+  late ChatController _chatController;
+  late ScrollController _scrollController;
+  
   bool _isListening = false;
   bool _isVoiceMode = false;
   final TextEditingController _textController = TextEditingController();
+  String _conversationTitle = 'Claude Killer';
 
   @override
   void initState() {
@@ -42,10 +50,64 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
       vsync: this,
     )..repeat(reverse: true);
     
+    _scrollController = ScrollController();
+    _chatController = ChatController();
+    
     // Add listener to update send button state
     _textController.addListener(() {
       setState(() {});
     });
+    
+    // Listen to chat controller changes
+    _chatController.addListener(_onChatControllerChanged);
+    
+    // Check API key when entering chat mode
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!AppConfig.useMockApi) {
+        _showApiKeyDialog();
+      }
+    });
+  }
+
+  void _onChatControllerChanged() {
+    if (mounted) {
+      setState(() {
+        // Update conversation title when messages exist
+        if (_chatController.hasMessages && _conversationTitle == 'Claude Killer') {
+          _updateConversationTitle();
+        }
+      });
+      
+      // Auto-scroll to bottom when new messages arrive or during streaming
+      if (_chatController.hasMessages) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      }
+    }
+  }
+
+  void _updateConversationTitle() {
+    if (_chatController.messages.isNotEmpty) {
+      final firstUserMessage = _chatController.messages
+          .where((msg) => msg.isUser)
+          .first
+          .text;
+      
+      // Generate a short title from the first message
+      List<String> words = firstUserMessage.split(' ');
+      if (words.length <= 3) {
+        _conversationTitle = firstUserMessage;
+      } else {
+        _conversationTitle = '${words.take(3).join(' ')}...';
+      }
+      
+      // Capitalize first letter
+      if (_conversationTitle.isNotEmpty) {
+        _conversationTitle = _conversationTitle[0].toUpperCase() + 
+                           _conversationTitle.substring(1);
+      }
+    }
   }
 
   @override
@@ -53,7 +115,10 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     _backgroundController.dispose();
     _breathingController.dispose();
     _glowController.dispose();
+    _scrollController.dispose();
     _textController.dispose();
+    _chatController.removeListener(_onChatControllerChanged);
+    _chatController.dispose();
     super.dispose();
   }
 
@@ -76,420 +141,588 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     HapticFeedback.lightImpact();
   }
 
-  void _sendMessage() {
-    if (_textController.text.trim().isNotEmpty) {
-      // Add message sending logic here
-      print('Sending message: ${_textController.text}');
-      _textController.clear();
-      HapticFeedback.lightImpact();
+  void _sendMessage() async {
+    final message = _textController.text.trim();
+    if (message.isEmpty) return;
+
+    // Clear the input field immediately for better UX
+    _textController.clear();
+    
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+    
+    // Provide haptic feedback
+    HapticFeedback.lightImpact();
+    
+    // Scroll to bottom to show the new message
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _scrollToBottom();
+    });
+    
+    // Send message with streaming for better UX
+    try {
+      await _chatController.sendMessage(message, useStreaming: true);
+      // Scroll to bottom after message is sent
+      Future.delayed(const Duration(milliseconds: 200), () {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      // Handle any errors gracefully
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to send message. Please try again.',
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
     }
+  }
+
+  void _showApiKeyDialog() async {
+    final hasKey = await _chatController.hasApiKey();
+    if (!hasKey) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => MultiModelApiDialog(
+          onApiKeysUpdated: () {
+            setState(() {}); // Refresh UI
+          },
+        ),
+      );
+    }
+  }
+
+  void _showSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
   }
 
   Widget _buildTextInputSection() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: const Color(0xFFE5E1DA).withOpacity(0.3),
-            width: 1,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F0E8),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF89A8B2).withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF89A8B2).withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Mic button to toggle voice mode
-            GestureDetector(
-              onTap: _toggleVoiceMode,
-              child: Container(
-                margin: const EdgeInsets.only(left: 4),
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF89A8B2),
-                      Color(0xFFB3C8CF),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Mic button to toggle voice mode
+              GestureDetector(
+                onTap: _toggleVoiceMode,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF89A8B2),
+                        Color(0xFFB3C8CF),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF89A8B2).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
-                ),
-                child: const Icon(
-                  Icons.mic_outlined,
-                  color: Colors.white,
-                  size: 22,
+                  child: const Icon(
+                    Icons.mic_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
-            ),
-            
-            // Text input field
-            Expanded(
-              child: Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Center(
+              
+              const SizedBox(width: 12),
+              
+              // Text input field with proper constraints
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minHeight: 44,
+                    maxHeight: 120,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: const Color(0xFFE5E1DA).withOpacity(0.5),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF89A8B2).withOpacity(0.1),
+                        blurRadius: 12,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: TextField(
                     controller: _textController,
+                    maxLines: null,
+                    textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
-                      hintText: 'Type your message...',
+                      hintText: 'Ask me anything...',
                       hintStyle: GoogleFonts.inter(
-                        color: const Color(0xFF89A8B2).withOpacity(0.5),
+                        color: const Color(0xFF89A8B2).withOpacity(0.6),
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                       ),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                     style: GoogleFonts.inter(
                       color: const Color(0xFF2C3E50),
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
+                      height: 1.4,
                     ),
-                    onSubmitted: (_) => _sendMessage(),
-                    maxLines: 1,
-                    textInputAction: TextInputAction.send,
+                    onChanged: (value) {
+                      setState(() {});
+                    },
+                    onTap: () {
+                      // Ensure latest messages are visible when keyboard appears
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        _scrollToBottom();
+                      });
+                    },
                   ),
                 ),
               ),
-            ),
-            
-            // Send button
-            GestureDetector(
-              onTap: _textController.text.trim().isNotEmpty ? _sendMessage : null,
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: _textController.text.trim().isNotEmpty 
-                    ? const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF89A8B2),
-                          Color(0xFFB3C8CF),
-                        ],
-                      )
-                    : LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF89A8B2).withOpacity(0.3),
-                          const Color(0xFFB3C8CF).withOpacity(0.3),
-                        ],
-                      ),
-                ),
-                child: Icon(
-                  Icons.send_rounded,
-                  color: _textController.text.trim().isNotEmpty 
-                    ? Colors.white 
-                    : Colors.white.withOpacity(0.7),
-                  size: 20,
+              
+              const SizedBox(width: 12),
+              
+              // Send button with better interaction
+              GestureDetector(
+                onTap: _textController.text.trim().isNotEmpty ? _sendMessage : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 44,
+                  height: 44,
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: _textController.text.trim().isNotEmpty 
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF89A8B2),
+                            Color(0xFFB3C8CF),
+                          ],
+                        )
+                      : LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF89A8B2).withOpacity(0.4),
+                            const Color(0xFFB3C8CF).withOpacity(0.4),
+                          ],
+                        ),
+                    boxShadow: _textController.text.trim().isNotEmpty 
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF89A8B2).withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
+                  ),
+                  child: Icon(
+                    Icons.send_rounded,
+                    color: _textController.text.trim().isNotEmpty 
+                      ? Colors.white 
+                      : Colors.white.withOpacity(0.7),
+                    size: 20,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F0E8),
-      body: Stack(
+      resizeToAvoidBottomInset: true, // This is crucial for keyboard handling
+      body: Column(
         children: [
-          // Cool gradient background with new color palette
-          AnimatedBuilder(
-            animation: _backgroundController,
-            builder: (context, child) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment(
-                      sin(_backgroundController.value * 2 * pi) * 0.2,
-                      cos(_backgroundController.value * 2 * pi) * 0.15,
-                    ),
-                    radius: 1.8,
-                    colors: [
-                      const Color(0xFF89A8B2).withOpacity(0.3),
-                      const Color(0xFFB3C8CF).withOpacity(0.2),
-                      const Color(0xFFE5E1DA).withOpacity(0.15),
-                      const Color(0xFFF1F0E8),
-                    ],
-                    stops: const [0.0, 0.4, 0.7, 1.0],
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Floating particles
-          ...List.generate(8, (index) => 
-            FloatingParticle(
-              index: index,
-              animation: _backgroundController,
-            ),
-          ),
-
-          // Main content area - removed breathing effect
-          SafeArea(
-            child: Column(
+          // Background and particles container
+          Expanded(
+            child: Stack(
               children: [
-                // Header with back button
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.9),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF89A8B2).withOpacity(0.2),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                // Cool gradient background with new color palette
+                AnimatedBuilder(
+                  animation: _backgroundController,
+                  builder: (context, child) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment(
+                            sin(_backgroundController.value * 2 * pi) * 0.2,
+                            cos(_backgroundController.value * 2 * pi) * 0.15,
                           ),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new,
-                            color: Color(0xFF89A8B2),
-                            size: 20,
-                          ),
+                          radius: 1.8,
+                          colors: [
+                            const Color(0xFF89A8B2).withOpacity(0.3),
+                            const Color(0xFFB3C8CF).withOpacity(0.2),
+                            const Color(0xFFE5E1DA).withOpacity(0.15),
+                            const Color(0xFFF1F0E8),
+                          ],
+                          stops: const [0.0, 0.4, 0.7, 1.0],
                         ),
                       ),
-                      const Spacer(),
-                      Text(
-                        "Claude Killer",
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF89A8B2),
-                        ),
-                      ),
-                      const Spacer(),
-                      const SizedBox(width: 44), // Balance the back button
-                    ],
+                    );
+                  },
+                ),
+
+                // Floating particles
+                ...List.generate(8, (index) => 
+                  FloatingParticle(
+                    index: index,
+                    animation: _backgroundController,
                   ),
                 ),
-                
-                // Part 1: Status text and AI logo section - Only show in voice mode
-                if (_isVoiceMode) SizedBox(
-                  height: 130, // Reduced height to accommodate header
+
+                // Main content area
+                SafeArea(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Status text
-                      if (_isListening)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Text(
-                            "Listening...",
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF89A8B2),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Text(
-                            "Ready and listening",
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF89A8B2),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      
-                      // AI Avatar
-                      AnimatedBuilder(
-                        animation: _glowController,
-                        builder: (context, child) {
-                          return Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFF89A8B2).withOpacity(0.3),
-                                  const Color(0xFFB3C8CF).withOpacity(0.2),
-                                  Colors.transparent,
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF89A8B2).withOpacity(0.2 + _glowController.value * 0.3),
-                                  blurRadius: 25 + _glowController.value * 10,
-                                  spreadRadius: 2 + _glowController.value * 5,
-                                ),
-                              ],
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Color(0xFF89A8B2),
-                                    Color(0xFFB3C8CF),
-                                    Color(0xFFE5E1DA),
-                                  ],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.psychology_outlined,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Part 2: Conversation area - takes remaining space
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ConversationDisplay(
-                      isListening: _isListening,
-                      glowAnimation: _glowController,
-                      showStatusText: false,
-                    ),
-                  ),
-                ),
-                
-                // Part 3: Input section - Text input or voice controls
-                if (_isVoiceMode) 
-                  SizedBox(
-                    height: 200, // Fixed height for voice controls
-                    child: Container(
-                      color: Colors.transparent,
-                      child: Stack(
-                        children: [
-                          // Wave visualization as background
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            top: -50,
-                            bottom: 0,
-                            child: Container(
-                              color: Colors.transparent,
-                              child: AudioVisualization(
-                                isActive: true,
-                                backgroundController: _backgroundController,
-                              ),
-                            ),
-                          ),
-                          
-                          // Exit voice mode button - top right
-                          Positioned(
-                            top: 20,
-                            right: 20,
-                            child: GestureDetector(
-                              onTap: _toggleVoiceMode,
+                      // Header with back button
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).pop(),
                               child: Container(
-                                width: 40,
-                                height: 40,
+                                width: 44,
+                                height: 44,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: Colors.white.withOpacity(0.9),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                                      color: const Color(0xFF89A8B2).withOpacity(0.2),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
                                 child: const Icon(
-                                  Icons.keyboard,
+                                  Icons.arrow_back_ios_new,
                                   color: Color(0xFF89A8B2),
                                   size: 20,
                                 ),
                               ),
                             ),
-                          ),
-                          
-                          // Control panel centered in this section
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              child: ControlPanel(
-                                isListening: _isListening,
-                                onToggleListening: _toggleListening,
-                                breathingAnimation: _breathingController,
-                                glowAnimation: _glowController,
+
+                            const Spacer(),
+                            Text(
+                              _conversationTitle,
+                              style: GoogleFonts.inter(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF89A8B2),
                               ),
                             ),
-                          ),
-                        ],
+                            const Spacer(),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Model switcher button
+                                GestureDetector(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => MultiModelApiDialog(
+                                        onApiKeysUpdated: () {
+                                          setState(() {}); // Refresh UI
+                                        },
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withOpacity(0.9),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF89A8B2).withOpacity(0.2),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.smart_toy,
+                                      color: Color(0xFF89A8B2),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: _showSettings,
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withOpacity(0.9),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF89A8B2).withOpacity(0.2),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.settings,
+                                      color: Color(0xFF89A8B2),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  )
-                else
-                  // Text input section - fixed height, no flex
-                  _buildTextInputSection(),
+                      
+                      // Part 1: Status text and AI logo section - Only show in voice mode
+                      if (_isVoiceMode) SizedBox(
+                        height: 130, // Reduced height to accommodate header
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Status text
+                            if (_isListening)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Text(
+                                  "Listening...",
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF89A8B2),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Text(
+                                  "Ready and listening",
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF89A8B2),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            
+                            // AI Avatar
+                            AnimatedBuilder(
+                              animation: _glowController,
+                              builder: (context, child) {
+                                return Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        const Color(0xFF89A8B2).withOpacity(0.3),
+                                        const Color(0xFFB3C8CF).withOpacity(0.2),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF89A8B2).withOpacity(0.2 + _glowController.value * 0.3),
+                                        blurRadius: 25 + _glowController.value * 10,
+                                        spreadRadius: 2 + _glowController.value * 5,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Container(
+                                    margin: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFF89A8B2),
+                                          Color(0xFFB3C8CF),
+                                          Color(0xFFE5E1DA),
+                                        ],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.psychology_outlined,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Part 2: Conversation area - takes remaining space
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: RealConversationDisplay(
+                            chatController: _chatController,
+                            scrollController: _scrollController,
+                            isListening: _isListening,
+                            glowAnimation: _glowController,
+                            showStatusText: false,
+                          ),
+                        ),
+                      ),
+                      
+                      // Part 3: Voice controls for voice mode
+                      if (_isVoiceMode) 
+                        SizedBox(
+                          height: 200, // Fixed height for voice controls
+                          child: Container(
+                            color: Colors.transparent,
+                            child: Stack(
+                              children: [
+                                // Wave visualization as background
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  top: -50,
+                                  bottom: 0,
+                                  child: Container(
+                                    color: Colors.transparent,
+                                    child: AudioVisualization(
+                                      isActive: true,
+                                      backgroundController: _backgroundController,
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Exit voice mode button - top right
+                                Positioned(
+                                  top: 20,
+                                  right: 20,
+                                  child: GestureDetector(
+                                    onTap: _toggleVoiceMode,
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.white.withOpacity(0.9),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.keyboard,
+                                        color: Color(0xFF89A8B2),
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Control panel centered in this section
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    child: ControlPanel(
+                                      isListening: _isListening,
+                                      onToggleListening: _toggleListening,
+                                      breathingAnimation: _breathingController,
+                                      glowAnimation: _glowController,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-
-          // Ambient glass overlay - removed bottom shadow
-          // Positioned.fill(
-          //   child: BackdropFilter(
-          //     filter: ImageFilter.blur(sigmaX: 0.3, sigmaY: 0.3),
-          //     child: Container(
-          //       decoration: BoxDecoration(
-          //         gradient: LinearGradient(
-          //           begin: Alignment.topCenter,
-          //           end: Alignment.center,
-          //           colors: [
-          //             const Color(0xFFF1F0E8).withOpacity(0.1),
-          //             Colors.transparent,
-          //           ],
-          //         ),
-          //       ),
-          //     ),
-          //   ),
-          // ),
+          
+          // Input section outside of the main stack for proper keyboard behavior
+          if (!_isVoiceMode) _buildTextInputSection(),
         ],
       ),
     );

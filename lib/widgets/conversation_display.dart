@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'shimmer_text.dart';
+import 'smooth_streaming_text.dart';
+import 'ai_loading_animation.dart';
 import '../models/chat_message.dart';
 
 class ConversationDisplay extends StatefulWidget {
@@ -231,31 +233,11 @@ class _ConversationDisplayState extends State<ConversationDisplay> {
           ? MainAxisAlignment.end 
           : MainAxisAlignment.start,
       children: [
-        if (!message.isUser) ...[
-          // AI avatar for AI messages
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF89A8B2), Color(0xFFB3C8CF)],
-              ),
-            ),
-            child: const Icon(
-              Icons.psychology_outlined,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        
-        // Message bubble
+        // Message bubble - removed avatars for cleaner look
         Flexible(
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
+              maxWidth: MediaQuery.of(context).size.width * 0.8, // Increased width since no avatars
             ),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
@@ -292,42 +274,31 @@ class _ConversationDisplayState extends State<ConversationDisplay> {
                       color: const Color(0xFFB3C8CF).withOpacity(0.3),
                       width: 1.0,
                     ),
-              // Removed boxShadow to eliminate unexpected shadows
             ),
-            child: Text(
-              message.text,
-              style: GoogleFonts.inter(
-                color: message.isUser 
-                    ? Colors.white 
-                    : const Color(0xFF4A5568),
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-                letterSpacing: 0.2,
-              ),
-            ),
+            child: message.isUser 
+                ? Text(
+                    message.text,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                      letterSpacing: 0.2,
+                    ),
+                  )
+                : WordStreamingText(
+                    text: message.text,
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF4A5568),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                      letterSpacing: 0.2,
+                    ),
+                    wordDelay: const Duration(milliseconds: 50),
+                  ),
           ),
         ),
-        
-        if (message.isUser) ...[
-          const SizedBox(width: 8),
-          // User avatar for user messages
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF89A8B2), Color(0xFFB3C8CF)],
-              ),
-            ),
-            child: const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-        ],
       ],
     );
   }
