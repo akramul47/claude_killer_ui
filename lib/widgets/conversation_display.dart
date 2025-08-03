@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'shimmer_text.dart';
 import 'smooth_streaming_text.dart';
-import 'ai_loading_animation.dart';
 import '../models/chat_message.dart';
 
 class ConversationDisplay extends StatefulWidget {
@@ -286,7 +285,7 @@ class _ConversationDisplayState extends State<ConversationDisplay> {
                       letterSpacing: 0.2,
                     ),
                   )
-                : WordStreamingText(
+                : SmoothStreamingText(
                     text: message.text,
                     style: GoogleFonts.inter(
                       color: const Color(0xFF4A5568),
@@ -295,7 +294,7 @@ class _ConversationDisplayState extends State<ConversationDisplay> {
                       height: 1.4,
                       letterSpacing: 0.2,
                     ),
-                    wordDelay: const Duration(milliseconds: 50),
+                    wordDelay: const Duration(milliseconds: 100),
                   ),
           ),
         ),

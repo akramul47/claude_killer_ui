@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../models/api_model.dart';
 import '../services/chat_controller.dart';
-import 'streaming_text.dart';
+import 'smooth_streaming_text.dart';
 import 'premium_loading_indicator.dart';
 
 class RealConversationDisplay extends StatefulWidget {
@@ -27,14 +27,20 @@ class RealConversationDisplay extends StatefulWidget {
 
 class _RealConversationDisplayState extends State<RealConversationDisplay>
     with TickerProviderStateMixin {
+  late AnimationController _dotsController;
 
   @override
   void initState() {
     super.initState();
+    _dotsController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
   }
 
   @override
   void dispose() {
+    _dotsController.dispose();
     super.dispose();
   }
 
@@ -101,14 +107,10 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
         final isStreaming = widget.chatController.isStreaming;
         final error = widget.chatController.error;
 
-        print('💬 UI: Messages count: ${messages.length}, isLoading: $isLoading, isStreaming: $isStreaming');
-        for (int i = 0; i < messages.length; i++) {
-          print('💬 UI: Message $i: "${messages[i].text}" (isUser: ${messages[i].isUser}, length: ${messages[i].text.length})');
-        }
+        print('💬 UI: Messages: ${messages.length}, isLoading: $isLoading, isStreaming: $isStreaming');
 
         // If no messages and not loading, show empty container
-        // The main screen will handle showing the welcome avatar
-        if (messages.isEmpty && !isLoading) {
+        if (messages.isEmpty && !isLoading && !isStreaming) {
           return const SizedBox.expand();
         }
 
@@ -117,10 +119,9 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
             // Error message at the top if present
             if (error != null) _buildErrorMessage(error),
             
-            // Messages list with stable key
+            // Messages list - use Column instead of ListView to avoid conflicts
             Expanded(
-              child: ListView.builder(
-                key: const ValueKey('conversation_listview'), // Fixed stable key
+              child: SingleChildScrollView(
                 controller: widget.scrollController,
                 padding: const EdgeInsets.only(
                   top: 8,
@@ -128,19 +129,20 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                   left: 0,
                   right: 0,
                 ),
-                itemCount: messages.length + (isLoading && !isStreaming ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index >= messages.length) {
-                    // Loading indicator
-                    return Container(
-                      key: ValueKey('loading_$index'),
-                      child: _buildLoadingMessage(),
-                    );
-                  }
-                  
-                  final message = messages[index];
-                  return _buildMessageBubble(message, index);
-                },
+                child: Column(
+                  children: [
+                    // Show all messages
+                    ...messages.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final message = entry.value;
+                      return _buildMessageBubble(message, index);
+                    }),
+                    
+                    // Show loading indicator when loading or streaming with empty content
+                    if (isLoading)
+                      _buildLoadingMessage(),
+                  ],
+                ),
               ),
             ),
           ],
@@ -193,9 +195,75 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
   }
 
   Widget _buildLoadingMessage() {
-    return PremiumLoadingIndicator(
-      uniqueId: 'conversation_loading',
-      avatarSize: 40.0,
+    print('🔄 Building loading message bubble'); // Debug print
+    return Padding(
+      key: const ValueKey('conversation_loading_indicator'),
+      padding: const EdgeInsets.only(bottom: 16, left: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Loading Message Bubble (positioned on left without avatar)
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(right: 80), // Leave space on right for left alignment
+            decoration: BoxDecoration(
+              color: const Color(0xFFE5E1DA),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+                bottomLeft: Radius.circular(8),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF89A8B2).withOpacity(0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // "Wait a sec..." text
+                Text(
+                  "Wait a sec",
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF4A5568),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Animated typing dots
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (index) {
+                    return AnimatedBuilder(
+                      animation: _dotsController,
+                      builder: (context, child) {
+                        final animationValue = (_dotsController.value * 3 - index).abs();
+                        final opacity = (1 - (animationValue % 1)).clamp(0.4, 1.0);
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF89A8B2).withOpacity(opacity),
+                          ),
+                        );
+                      },
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -203,8 +271,8 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
     final timeFormatter = DateFormat('HH:mm');
     final isStreaming = message.status == MessageStatus.streaming;
     
-    return Padding(
-      key: ValueKey('msg_${message.id}_${index}'), // Include index for extra uniqueness
+    return Container(
+      key: ValueKey('message_${message.id}'), // Use only message ID for stability
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
       child: Row(
         mainAxisAlignment: message.isUser 
@@ -274,8 +342,8 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                               ),
                             )
                           : message.text.isNotEmpty
-                              ? WordStreamingText(
-                                  key: ValueKey('stream_${message.id}_${index}'), // Include index for uniqueness
+                              ? SmoothStreamingText(
+                                  key: ValueKey('stream_${message.id}'), // Stable key using message ID
                                   text: message.text,
                                   style: GoogleFonts.inter(
                                     color: const Color(0xFF4A5568),
@@ -284,7 +352,7 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                                     height: 1.4,
                                     letterSpacing: 0.2,
                                   ),
-                                  wordDelay: const Duration(milliseconds: 150), // Slower for smoother fade
+                                  wordDelay: const Duration(milliseconds: 80), // Smooth and relaxed
                                 )
                               : message.text.isEmpty
                                 ? (isStreaming 

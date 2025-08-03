@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'http_client_helper.dart';
 
 abstract class ApiService {
   Future<String> sendMessage(String message, {List<Map<String, String>>? conversationHistory});
@@ -50,8 +51,8 @@ class GeminiApiService implements ApiService {
       print('📝 Model: ${modelName}');
       print('💬 Message: ${message.substring(0, message.length > 50 ? 50 : message.length)}...');
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/models/gemini-pro:generateContent?key=$_apiKey'),
+      final response = await HttpClientHelper.postWithTimeout(
+        url: Uri.parse('$_baseUrl/models/gemini-pro:generateContent?key=$_apiKey'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -192,8 +193,8 @@ class CohereApiService implements ApiService {
       print('📝 Model: ${modelName}');
       print('💬 Message: ${message.substring(0, message.length > 50 ? 50 : message.length)}...');
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/generate'),
+      final response = await HttpClientHelper.postWithTimeout(
+        url: Uri.parse('$_baseUrl/generate'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_apiKey',
@@ -317,8 +318,8 @@ class OpenAIApiService implements ApiService {
       print('📝 Model: $_model');
       print('💬 Message: ${message.substring(0, message.length > 50 ? 50 : message.length)}...');
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/chat/completions'),
+      final response = await HttpClientHelper.postWithTimeout(
+        url: Uri.parse('$_baseUrl/chat/completions'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_apiKey',

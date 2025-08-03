@@ -5,10 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/floating_particle.dart';
 import '../widgets/real_conversation_display.dart';
-import '../widgets/audio_visualization.dart';
-import '../widgets/control_panel.dart';
+// import '../widgets/audio_visualization.dart'; // COMMENTED OUT - voice controls disabled
+// import '../widgets/control_panel.dart'; // COMMENTED OUT - voice controls disabled
 import '../widgets/multi_model_api_dialog.dart';
 import '../widgets/shared/shared_premium_avatar.dart';
+import '../widgets/smooth_one_time_streaming_text.dart';
 import '../services/chat_controller.dart';
 import '../constants/app_config.dart';
 import 'settings_screen.dart';
@@ -152,13 +153,14 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     super.dispose();
   }
 
-  void _toggleListening() {
-    setState(() {
-      _isListening = !_isListening;
-    });
-    
-    HapticFeedback.lightImpact();
-  }
+  // COMMENTED OUT - voice controls disabled to free up space
+  // void _toggleListening() {
+  //   setState(() {
+  //     _isListening = !_isListening;
+  //   });
+  //   
+  //   HapticFeedback.lightImpact();
+  // }
 
   void _toggleVoiceMode() {
     setState(() {
@@ -575,278 +577,141 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
                         ),
                       ),
                       
-                      // Part 1: Premium Avatar and welcome text - Only show in text mode when no messages
-                      if (!_isVoiceMode && !_chatController.hasMessages) 
+                      // Part 1: Premium Avatar and welcome text - Only show in text mode when no messages AND not loading
+                      if (!_isVoiceMode && !_chatController.hasMessages && !_chatController.isLoading) 
                         Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-                              final isKeyboardVisible = keyboardHeight > 0;
-                              final availableHeight = constraints.maxHeight;
-                              
-                              // More defensive layout calculation with keyboard handling
-                              final textHeight = 50.0; // Reserve space for welcome text
-                              final minAvatarSize = 50.0;
-                              final maxAvatarSize = 120.0;
-                              
-                              // When keyboard is visible, use much smaller spacing and avatar
-                              if (isKeyboardVisible || availableHeight < 300) {
-                                final compactAvatarSize = 60.0;
-                                final compactSpacing = 16.0;
-                                final compactTextHeight = 40.0;
-                                
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  child: FadeTransition(
-                                    opacity: _fadeController,
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        // Compact top spacing
-                                        SizedBox(height: compactSpacing),
-                                        
-                                        // Compact Premium Avatar
-                                        SharedPremiumAvatar(
-                                          size: compactAvatarSize,
-                                          heroTag: 'premium_avatar',
-                                          showGlow: true,
-                                        ),
-                                        
-                                        // Compact middle spacing
-                                        SizedBox(height: compactSpacing),
-                                        
-                                        // Compact welcome text
-                                        Container(
-                                          constraints: BoxConstraints(
-                                            maxWidth: 280,
-                                            maxHeight: compactTextHeight,
-                                          ),
-                                          child: AnimatedBuilder(
-                                            animation: _fadeController,
-                                            builder: (context, child) {
-                                              return Transform.scale(
-                                                scale: 0.95 + (_fadeController.value * 0.05),
-                                                child: Text(
-                                                  "How can I help you today?",
-                                                  style: GoogleFonts.inter(
-                                                    fontSize: 14.0,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: const Color(0xFF4A5568),
-                                                    height: 1.2,
-                                                    letterSpacing: 0.2,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        
-                                        // Compact bottom spacing
-                                        SizedBox(height: compactSpacing),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }
-                              
-                              // Normal layout when keyboard is hidden
-                              final availableForAvatar = availableHeight - textHeight - 120; // More padding for spacing
-                              final avatarSize = availableForAvatar.clamp(minAvatarSize, maxAvatarSize);
-                              
-                              // Calculate spacing proportionally
-                              final totalSpacingAvailable = availableHeight - avatarSize - textHeight;
-                              final topSpacing = (totalSpacingAvailable * 0.4).clamp(20.0, 80.0);
-                              final middleSpacing = (totalSpacingAvailable * 0.35).clamp(24.0, 60.0);
-                              final bottomSpacing = (totalSpacingAvailable * 0.25).clamp(20.0, 60.0);
-                              
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
-                                child: FadeTransition(
-                                  opacity: _fadeController,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      // Top spacing
-                                      SizedBox(height: topSpacing),
-                                      
-                                      // Premium Avatar with optimal sizing
-                                      SharedPremiumAvatar(
-                                        size: avatarSize,
-                                        heroTag: 'premium_avatar',
-                                        showGlow: true,
-                                      ),
-                                      
-                                      // Middle spacing - increased for better visual separation
-                                      SizedBox(height: middleSpacing),
-                                      
-                                      // Welcome text - properly sized and spaced
-                                      Container(
-                                        constraints: BoxConstraints(
-                                          maxWidth: 320,
-                                          maxHeight: textHeight,
-                                        ),
-                                        child: AnimatedBuilder(
-                                          animation: _fadeController,
-                                          builder: (context, child) {
-                                            return Transform.scale(
-                                              scale: 0.95 + (_fadeController.value * 0.05),
-                                              child: Text(
-                                                "How can I help you today?",
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 18.0,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: const Color(0xFF4A5568),
-                                                  height: 1.3,
-                                                  letterSpacing: 0.3,
-                                                ),
-                                                textAlign: TextAlign.center,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      
-                                      // Bottom spacing
-                                      SizedBox(height: bottomSpacing),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-
-                      // Part 1 Alternative: Status text and AI logo section - Only show in voice mode
-                      if (_isVoiceMode) SizedBox(
-                        height: 130, // Reduced height to accommodate header
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Status text
-                            if (_isListening)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: Text(
-                                  "Listening...",
-                                  style: GoogleFonts.inter(
-                                    color: const Color(0xFF89A8B2),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              )
-                            else
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: Text(
-                                  "Ready and listening",
-                                  style: GoogleFonts.inter(
-                                    color: const Color(0xFF89A8B2),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            
-                            // Smaller avatar for voice mode
-                            SharedPremiumAvatar(
-                              size: 80.0,
-                              heroTag: 'premium_avatar_voice',
-                              showGlow: _isListening,
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      // Part 2: Conversation area - always present to maintain scroll controller
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: RealConversationDisplay(
-                            chatController: _chatController,
-                            scrollController: _scrollController,
-                            isListening: _isListening,
-                            showStatusText: false,
-                          ),
-                        ),
-                      ),
-                      
-                      // Part 3: Voice controls for voice mode
-                      if (_isVoiceMode) 
-                        SizedBox(
-                          height: 200, // Fixed height for voice controls
-                          child: Container(
-                            color: Colors.transparent,
-                            child: Stack(
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                            child: Column(
                               children: [
-                                // Wave visualization as background
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  top: -50,
-                                  bottom: 0,
+                                // Dynamic top spacing based on screen height - INCREASED for center positioning
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.25, // 25% of screen height - increased
+                                ),
+                                
+                                // Premium Avatar - EXACT same size as homepage
+                                FadeTransition(
+                                  opacity: _fadeController,
+                                  child: SharedPremiumAvatar(
+                                    size: 120.0, // Exactly matches homepage
+                                    heroTag: 'premium_avatar',
+                                    showGlow: true,
+                                  ),
+                                ),
+                                
+                                // Spacing after avatar - EXACT same as homepage
+                                const SizedBox(height: 70.0), // Same as homepage
+                                
+                                // Typewriter effect text - EXACT same styling as homepage
+                                FadeTransition(
+                                  opacity: _fadeController,
                                   child: Container(
-                                    color: Colors.transparent,
-                                    child: AudioVisualization(
-                                      isActive: true,
-                                      backgroundController: _backgroundController,
+                                    constraints: const BoxConstraints(maxWidth: 320),
+                                    child: SmoothOneTimeStreamingText(
+                                      text: "How can I help you today?",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 20, // Same as homepage
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF4A5568),
+                                        height: 1.25,
+                                        letterSpacing: 0.3,
+                                      ),
+                                      characterDelay: const Duration(milliseconds: 80),
                                     ),
                                   ),
                                 ),
                                 
-                                // Exit voice mode button - top right
-                                Positioned(
-                                  top: 20,
-                                  right: 20,
-                                  child: GestureDetector(
-                                    onTap: _toggleVoiceMode,
-                                    child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.white.withOpacity(0.9),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.keyboard,
-                                        color: Color(0xFF89A8B2),
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                
-                                // Control panel centered in this section
-                                Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                                    child: ControlPanel(
-                                      isListening: _isListening,
-                                      onToggleListening: _toggleListening,
-                                      breathingAnimation: _breathingController,
-                                    ),
-                                  ),
+                                // Dynamic bottom spacing to ensure scrollability - REDUCED for better centering
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.15, // 15% of screen height - reduced
                                 ),
                               ],
                             ),
                           ),
                         ),
+
+                      // Part 2: Conversation area - always present to maintain scroll controller
+                      if (!_isVoiceMode && (_chatController.hasMessages || _chatController.isLoading))
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: RealConversationDisplay(
+                              chatController: _chatController,
+                              scrollController: _scrollController,
+                              isListening: _isListening,
+                              showStatusText: false,
+                            ),
+                          ),
+                        ),
+                      
+                      // Part 3: Voice controls for voice mode - COMMENTED OUT TO FREE UP SPACE
+                      // if (_isVoiceMode) 
+                      //   SizedBox(
+                      //     height: 200, // Fixed height for voice controls
+                      //     child: Container(
+                      //       color: Colors.transparent,
+                      //       child: Stack(
+                      //         children: [
+                      //           // Wave visualization as background
+                      //           Positioned(
+                      //             left: 0,
+                      //             right: 0,
+                      //             top: -50,
+                      //             bottom: 0,
+                      //             child: Container(
+                      //               color: Colors.transparent,
+                      //               child: AudioVisualization(
+                      //                 isActive: true,
+                      //                 backgroundController: _backgroundController,
+                      //               ),
+                      //             ),
+                      //           ),
+                                
+                                // // Exit voice mode button - top right
+                                // Positioned(
+                                //   top: 20,
+                                //   right: 20,
+                                //   child: GestureDetector(
+                                //     onTap: _toggleVoiceMode,
+                                //     child: Container(
+                                //       width: 40,
+                                //       height: 40,
+                                //       decoration: BoxDecoration(
+                                //         shape: BoxShape.circle,
+                                //         color: Colors.white.withOpacity(0.9),
+                                //         boxShadow: [
+                                //           BoxShadow(
+                                //             color: Colors.black.withOpacity(0.1),
+                                //             blurRadius: 8,
+                                //             offset: const Offset(0, 2),
+                                //           ),
+                                //         ],
+                                //       ),
+                                //       child: const Icon(
+                                //         Icons.keyboard,
+                                //         color: Color(0xFF89A8B2),
+                                //         size: 20,
+                                //       ),
+                                //     ),
+                                //   ),
+                                // ),
+                                //
+                                // // Control panel centered in this section
+                                // Center(
+                                //   child: Padding(
+                                //     padding: const EdgeInsets.symmetric(horizontal: 20),
+                                //     child: ControlPanel(
+                                //       isListening: _isListening,
+                                //       onToggleListening: _toggleListening,
+                                //       breathingAnimation: _breathingController,
+                                //     ),
+                                //   ),
+                                // ),
+                              // ],
+                            // ),
+                          // ),
+                        // ),
                     ],
                   ),
                 ),

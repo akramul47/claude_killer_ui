@@ -142,11 +142,16 @@ class ChatController extends ChangeNotifier {
       // Build conversation history for context
       final conversationHistory = _buildConversationHistory();
       
-      // Get AI response
-      final response = await currentApiService.sendMessage(
+      // Start both the API call and minimum loading time
+      final apiResponseFuture = currentApiService.sendMessage(
         text.trim(), 
         conversationHistory: conversationHistory,
       );
+      final minimumLoadingTime = Future.delayed(const Duration(milliseconds: 1000));
+      
+      // Wait for both to complete to ensure loading indicator is visible
+      final results = await Future.wait([apiResponseFuture, minimumLoadingTime]);
+      final response = results[0] as String;
       
       print('🤖 Chat Controller received response: "$response"');
       
@@ -239,44 +244,90 @@ class ChatController extends ChangeNotifier {
       _setLoading(false);
     }
   }  Future<void> _sendStreamMessage(String text) async {
+    _setLoading(true); // Show loading indicator initially
     _setStreaming(true);
     _setError(null);
-
-    // Create placeholder AI message for streaming
-    final aiMessage = ChatMessage(
-      text: '',
-      isUser: false,
-      conversationId: _currentConversationId,
-      status: MessageStatus.streaming,
-    );
-    
-    _messages.add(aiMessage);
-    notifyListeners();
 
     try {
       // Build conversation history for context
       final conversationHistory = _buildConversationHistory();
       
-      final stream = await currentApiService.sendStreamMessage(
+      // Start the stream request
+      final streamFuture = currentApiService.sendStreamMessage(
         text.trim(),
         conversationHistory: conversationHistory,
       );
       
+      // Ensure minimum loading time of 1500ms to show the loading indicator properly
+      final minimumLoadingTime = Future.delayed(const Duration(milliseconds: 1500));
+      
+      // Wait for both the stream to be ready and minimum loading time
+      final results = await Future.wait([streamFuture, minimumLoadingTime]);
+      final stream = results[0] as Stream<String>;
+      
+      print('🎯 Stream ready - creating placeholder message');
+      
+      // Create placeholder AI message for streaming ONLY after minimum loading time
+      final aiMessage = ChatMessage(
+        text: '',
+        isUser: false,
+        conversationId: _currentConversationId,
+        status: MessageStatus.streaming,
+      );
+      
+      _messages.add(aiMessage);
+      notifyListeners();
+      
       String fullResponse = '';
+      int updateCounter = 0;
+      List<String> chunkBuffer = []; // Buffer to ensure smooth streaming
+      bool hasStartedDisplaying = false; // Track if we've started showing text
+      final bufferStartTime = DateTime.now(); // Track buffering time
       
       await for (final chunk in stream) {
+        chunkBuffer.add(chunk);
         fullResponse += chunk;
+        updateCounter++;
         
-        // Update the last message with new content
-        final lastIndex = _messages.length - 1;
-        if (lastIndex >= 0 && !_messages[lastIndex].isUser) {
-          _messages[lastIndex] = _messages[lastIndex].copyWith(
-            text: fullResponse,
-            status: MessageStatus.streaming,
-          );
-          notifyListeners();
+        // Calculate buffering time
+        final bufferingDuration = DateTime.now().difference(bufferStartTime).inMilliseconds;
+        
+        // Wait for substantial content before stopping loading indicator
+        // OR timeout after 3 seconds to prevent infinite loading
+        if (fullResponse.length >= 15 || 
+            chunkBuffer.length >= 8 || 
+            bufferingDuration > 3000) {
+          // Now we can stop the loading indicator and start streaming
+          if (!hasStartedDisplaying) {
+            print('🎯 Starting text display - stopping loading indicator (buffer: ${chunkBuffer.length}, chars: ${fullResponse.length}, time: ${bufferingDuration}ms)');
+            _setLoading(false);
+            hasStartedDisplaying = true;
+          }
+          
+          // Update the last message with new content
+          final lastIndex = _messages.length - 1;
+          if (lastIndex >= 0 && !_messages[lastIndex].isUser) {
+            _messages[lastIndex] = _messages[lastIndex].copyWith(
+              text: fullResponse,
+              status: MessageStatus.streaming,
+            );
+            
+            // Reduce stuttering by throttling notifications (update every 3 chunks for smoother experience)
+            if (updateCounter % 3 == 0) {
+              notifyListeners();
+            }
+          }
         }
       }
+      
+      // Ensure loading indicator is stopped even if we didn't hit the buffer threshold
+      if (_isLoading) {
+        print('🎯 Stream ended - ensuring loading indicator is stopped');
+        _setLoading(false);
+      }
+      
+      // Final notification to ensure UI shows the complete message
+      notifyListeners();
       
       // Mark message as sent when streaming is complete
       final lastIndex = _messages.length - 1;
