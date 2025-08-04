@@ -191,9 +191,9 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
       _scrollToBottom();
     });
     
-    // Send message with streaming for better UX
+    // Send message without streaming (using shimmer effect instead)
     try {
-      await _chatController.sendMessage(message, useStreaming: true);
+      await _chatController.sendMessage(message, useStreaming: false);
       // Scroll to bottom after message is sent
       Future.delayed(const Duration(milliseconds: 200), () {
         _scrollToBottom();

@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class ShimmerText extends StatefulWidget {
   final String text;
   final TextStyle style;
+  final Duration shimmerDuration;
 
   const ShimmerText({
     super.key,
     required this.text,
     required this.style,
+    this.shimmerDuration = const Duration(milliseconds: 600),
   });
 
   @override
@@ -22,10 +24,11 @@ class _ShimmerTextState extends State<ShimmerText>
   @override
   void initState() {
     super.initState();
+    
     _shimmerController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: widget.shimmerDuration,
       vsync: this,
-    )..repeat();
+    );
 
     _shimmerAnimation = Tween<double>(
       begin: -1.0,
@@ -34,6 +37,9 @@ class _ShimmerTextState extends State<ShimmerText>
       parent: _shimmerController,
       curve: Curves.easeInOut,
     ));
+
+    // Start the shimmer animation once
+    _shimmerController.forward();
   }
 
   @override
@@ -48,6 +54,7 @@ class _ShimmerTextState extends State<ShimmerText>
       animation: _shimmerAnimation,
       builder: (context, child) {
         return ShaderMask(
+          blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) {
             return LinearGradient(
               begin: Alignment.centerLeft,
@@ -55,17 +62,17 @@ class _ShimmerTextState extends State<ShimmerText>
               colors: [
                 widget.style.color!,
                 widget.style.color!.withOpacity(0.8),
-                Colors.white.withOpacity(0.8),
+                Colors.white.withOpacity(0.9),
                 widget.style.color!.withOpacity(0.8),
                 widget.style.color!,
               ],
               stops: [
                 0.0,
-                _shimmerAnimation.value - 0.3,
-                _shimmerAnimation.value,
-                _shimmerAnimation.value + 0.3,
+                (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
+                _shimmerAnimation.value.clamp(0.0, 1.0),
+                (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
                 1.0,
-              ].map((stop) => stop.clamp(0.0, 1.0)).toList(),
+              ],
             ).createShader(bounds);
           },
           child: Text(

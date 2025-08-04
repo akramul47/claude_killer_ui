@@ -4,8 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../models/api_model.dart';
 import '../services/chat_controller.dart';
-import 'smooth_streaming_text.dart';
-import 'premium_loading_indicator.dart';
+import 'shimmer_text.dart';
 
 class RealConversationDisplay extends StatefulWidget {
   final ChatController chatController;
@@ -108,6 +107,7 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
         final error = widget.chatController.error;
 
         print('💬 UI: Messages: ${messages.length}, isLoading: $isLoading, isStreaming: $isStreaming');
+        print('🔄 Should show loading? ${isLoading && !isStreaming}');
 
         // If no messages and not loading, show empty container
         if (messages.isEmpty && !isLoading && !isStreaming) {
@@ -138,9 +138,10 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                       return _buildMessageBubble(message, index);
                     }),
                     
-                    // Show loading indicator when loading or streaming with empty content
-                    if (isLoading)
+                    // Show loading indicator when loading (with proper logic)
+                    if (isLoading) ...[
                       _buildLoadingMessage(),
+                    ],
                   ],
                 ),
               ),
@@ -195,69 +196,86 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
   }
 
   Widget _buildLoadingMessage() {
-    print('🔄 Building loading message bubble'); // Debug print
+    print('🔄 Building loading message widget'); // Debug print
     return Padding(
-      key: const ValueKey('conversation_loading_indicator'),
-      padding: const EdgeInsets.only(bottom: 16, left: 16),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start, // Align to left like AI messages
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Loading Message Bubble (positioned on left without avatar)
-          Container(
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(right: 80), // Leave space on right for left alignment
-            decoration: BoxDecoration(
-              color: const Color(0xFFE5E1DA),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-                bottomLeft: Radius.circular(8),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF89A8B2).withOpacity(0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
+          Flexible(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // "Wait a sec..." text
-                Text(
-                  "Wait a sec",
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF4A5568),
-                    height: 1.4,
+                Container(
+                  key: const ValueKey('loading_message'),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.85,
+                    minHeight: 56,
                   ),
-                ),
-                const SizedBox(height: 8),
-                // Animated typing dots
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(3, (index) {
-                    return AnimatedBuilder(
-                      animation: _dotsController,
-                      builder: (context, child) {
-                        final animationValue = (_dotsController.value * 3 - index).abs();
-                        final opacity = (1 - (animationValue % 1)).clamp(0.4, 1.0);
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF89A8B2).withOpacity(opacity),
-                          ),
-                        );
-                      },
-                    );
-                  }),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E1DA),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
+                      bottomLeft: Radius.circular(8),
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFB3C8CF).withOpacity(0.3),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF89A8B2).withOpacity(0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // "Wait a sec..." text
+                      Text(
+                        "Wait a sec",
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF4A5568),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Animated typing dots
+                      SizedBox(
+                        height: 8,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(3, (index) {
+                            return AnimatedBuilder(
+                              animation: _dotsController,
+                              builder: (context, child) {
+                                final animationValue = (_dotsController.value * 3 - index).abs();
+                                final opacity = (1 - (animationValue % 1)).clamp(0.4, 1.0);
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF89A8B2).withOpacity(opacity),
+                                  ),
+                                );
+                              },
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -269,7 +287,6 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
 
   Widget _buildMessageBubble(ChatMessage message, int index) {
     final timeFormatter = DateFormat('HH:mm');
-    final isStreaming = message.status == MessageStatus.streaming;
     
     return Container(
       key: ValueKey('message_${message.id}'), // Use only message ID for stability
@@ -342,8 +359,8 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                               ),
                             )
                           : message.text.isNotEmpty
-                              ? SmoothStreamingText(
-                                  key: ValueKey('stream_${message.id}'), // Stable key using message ID
+                              ? ShimmerText(
+                                  key: ValueKey('shimmer_${message.id}'), // Stable key using message ID
                                   text: message.text,
                                   style: GoogleFonts.inter(
                                     color: const Color(0xFF4A5568),
@@ -352,54 +369,19 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                                     height: 1.4,
                                     letterSpacing: 0.2,
                                   ),
-                                  wordDelay: const Duration(milliseconds: 80), // Smooth and relaxed
+                                  shimmerDuration: const Duration(milliseconds: 400), // Quick shimmer
                                 )
-                              : message.text.isEmpty
-                                ? (isStreaming 
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Row(
-                                          children: [
-                                            PremiumLoadingIndicator(
-                                              avatarSize: 24.0,
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : Text(
-                                        'No response received',
-                                        style: GoogleFonts.inter(
-                                          color: const Color(0xFF4A5568).withOpacity(0.6),
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          height: 1.4,
-                                          letterSpacing: 0.2,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ))
-                                : Text(
-                                    message.text,
-                                    style: GoogleFonts.inter(
-                                      color: const Color(0xFF4A5568),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                      height: 1.4,
-                                      letterSpacing: 0.2,
-                                    ),
+                              : Text(
+                                  'No response received',
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF4A5568).withOpacity(0.6),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                    letterSpacing: 0.2,
+                                    fontStyle: FontStyle.italic,
                                   ),
-                      if (isStreaming) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: message.isUser 
-                                ? Colors.white.withOpacity(0.7)
-                                : const Color(0xFF89A8B2),
-                          ),
-                        ),
-                      ],
+                                ),
                     ],
                   ),
                 ),
