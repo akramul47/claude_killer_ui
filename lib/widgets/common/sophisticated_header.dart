@@ -366,7 +366,7 @@ class UltraPremiumProfileSection extends StatelessWidget {
               
               // Main profile avatar with enterprise-grade styling
               Positioned(
-                bottom: 0,
+                bottom: -3,
                 child: Transform.scale(
                   scale: breatheScale,
                   child: Container(
@@ -378,10 +378,10 @@ class UltraPremiumProfileSection extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          const Color(0xFF1E3A8A),
-                          const Color(0xFF3B82F6),
-                          const Color(0xFF1E3A8A).withOpacity(0.95),
-                          const Color(0xFF3B82F6).withOpacity(0.9),
+                          const Color(0xFF4169E1), // royal blue
+                          const Color(0xFF6A89CC), // lighter royal blue
+                          const Color(0xFF4169E1).withOpacity(0.85),
+                          const Color(0xFF6A89CC).withOpacity(0.8),
                         ],
                         stops: const [0.0, 0.4, 0.7, 1.0],
                       ),
@@ -475,9 +475,9 @@ class UltraPremiumProfileSection extends StatelessWidget {
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: [
-                                      Color(0xFF22C55E),
-                                      Color(0xFF15803D),
-                                      Color(0xFF166534),
+                                      Color(0xFFBBF7D0), // light green
+                                      Color(0xFF22C55E), // vibrant green
+                                      Color(0xFFFDE047), // yellow accent
                                     ],
                                     stops: [0.0, 0.6, 1.0],
                                   ),
