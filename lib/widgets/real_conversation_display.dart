@@ -240,9 +240,9 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                     children: [
                       // "Wait a sec..." text
                       Text(
-                        "Wait a sec",
+                        "Wait a sec...",
                         style: GoogleFonts.inter(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: const Color(0xFF4A5568),
                           height: 1.4,
@@ -251,7 +251,7 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                       const SizedBox(height: 8),
                       // Animated typing dots
                       SizedBox(
-                        height: 8,
+                        height: 6,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: List.generate(3, (index) {
@@ -262,8 +262,8 @@ class _RealConversationDisplayState extends State<RealConversationDisplay>
                                 final opacity = (1 - (animationValue % 1)).clamp(0.4, 1.0);
                                 return Container(
                                   margin: const EdgeInsets.symmetric(horizontal: 2),
-                                  width: 8,
-                                  height: 8,
+                                  width: 6,
+                                  height: 6,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: const Color(0xFF89A8B2).withOpacity(opacity),

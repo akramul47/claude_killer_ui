@@ -245,14 +245,16 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
   Widget _buildTextInputSection() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F0E8),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF89A8B2).withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        // color: const Color(0xFFF1F0E8),
+        color: Colors.transparent,
+        // color: const Color(0xFFF1F0E8),
+        // boxShadow: [
+        //   BoxShadow(
+        //     color: const Color(0xFF89A8B2).withOpacity(0.1),
+        //     blurRadius: 8,
+        //     offset: const Offset(0, -2),
+        //   ),
+        // ],
       ),
       child: SafeArea(
         top: false,
@@ -436,37 +438,37 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
             child: Stack(
               children: [
                 // Cool gradient background with new color palette
-                AnimatedBuilder(
-                  animation: _backgroundController,
-                  builder: (context, child) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment(
-                            sin(_backgroundController.value * 2 * pi) * 0.2,
-                            cos(_backgroundController.value * 2 * pi) * 0.15,
-                          ),
-                          radius: 1.8,
-                          colors: [
-                            const Color(0xFF89A8B2).withOpacity(0.3),
-                            const Color(0xFFB3C8CF).withOpacity(0.2),
-                            const Color(0xFFE5E1DA).withOpacity(0.15),
-                            const Color(0xFFF1F0E8),
-                          ],
-                          stops: const [0.0, 0.4, 0.7, 1.0],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                // AnimatedBuilder(
+                //   animation: _backgroundController,
+                //   builder: (context, child) {
+                //     return Container(
+                //       decoration: BoxDecoration(
+                //         gradient: RadialGradient(
+                //           center: Alignment(
+                //             sin(_backgroundController.value * 2 * pi) * 0.2,
+                //             cos(_backgroundController.value * 2 * pi) * 0.15,
+                //           ),
+                //           radius: 1.8,
+                //           colors: [
+                //             const Color(0xFF89A8B2).withOpacity(0.3),
+                //             const Color(0xFFB3C8CF).withOpacity(0.2),
+                //             const Color(0xFFE5E1DA).withOpacity(0.15),
+                //             const Color(0xFFF1F0E8),
+                //           ],
+                //           stops: const [0.0, 0.4, 0.7, 1.0],
+                //         ),
+                //       ),
+                //     );
+                //   },
+                // ),
 
-                // Floating particles
-                ...List.generate(8, (index) => 
-                  FloatingParticle(
-                    index: index,
-                    animation: _backgroundController,
-                  ),
-                ),
+                // // Floating particles
+                // ...List.generate(8, (index) => 
+                //   FloatingParticle(
+                //     index: index,
+                //     animation: _backgroundController,
+                //   ),
+                // ),
 
                 // Main content area
                 SafeArea(
