@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_config.dart';
 import '../widgets/api_key_dialog.dart';
+import '../widgets/multi_model_api_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -33,6 +34,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           );
+        },
+      ),
+    );
+  }
+
+  void _showAiModelDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => MultiModelApiDialog(
+        onApiKeysUpdated: () {
+          setState(() {}); // Refresh UI to reflect changes
         },
       ),
     );
@@ -98,8 +110,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 12),
                   
                   _buildSettingsCard(
+                    icon: Icons.smart_toy,
+                    title: 'AI Model Settings',
+                    subtitle: 'Configure AI models and API keys',
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Color(0xFF89A8B2),
+                      size: 16,
+                    ),
+                    onTap: _showAiModelDialog,
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  _buildSettingsCard(
                     icon: Icons.key,
-                    title: 'OpenAI API Key',
+                    title: 'OpenAI API Key (Legacy)',
                     subtitle: ApiKeys.hasOpenAIApiKey 
                         ? 'API key configured'
                         : 'No API key set',

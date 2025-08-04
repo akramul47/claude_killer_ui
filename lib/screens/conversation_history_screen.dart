@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../models/conversation.dart';
 import '../services/chat_controller.dart';
+import 'voice_assistant_screen.dart';
 
 class ConversationHistoryScreen extends StatefulWidget {
   final ChatController chatController;
@@ -85,9 +86,20 @@ class _ConversationHistoryScreenState extends State<ConversationHistoryScreen> {
     }
   }
 
-  void _selectConversation(Conversation conversation) {
-    widget.chatController.loadConversation(conversation.id);
-    Navigator.of(context).pop();
+  void _selectConversation(Conversation conversation) async {
+    // Load the conversation into the chat controller
+    await widget.chatController.loadConversation(conversation.id);
+    
+    // Navigate to the voice assistant screen with the loaded conversation
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => VoiceAssistantUI(
+            chatController: widget.chatController,
+          ),
+        ),
+      );
+    }
   }
 
   @override

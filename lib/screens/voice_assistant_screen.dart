@@ -1,9 +1,7 @@
-import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../widgets/floating_particle.dart';
 import '../widgets/real_conversation_display.dart';
 // import '../widgets/audio_visualization.dart'; // COMMENTED OUT - voice controls disabled
 // import '../widgets/control_panel.dart'; // COMMENTED OUT - voice controls disabled
@@ -12,10 +10,11 @@ import '../widgets/shared/shared_premium_avatar.dart';
 import '../widgets/smooth_one_time_streaming_text.dart';
 import '../services/chat_controller.dart';
 import '../constants/app_config.dart';
-import 'settings_screen.dart';
 
 class VoiceAssistantUI extends StatefulWidget {
-  const VoiceAssistantUI({super.key});
+  final ChatController? chatController;
+  
+  const VoiceAssistantUI({super.key, this.chatController});
 
   @override
   State<VoiceAssistantUI> createState() => _VoiceAssistantUIState();
@@ -62,7 +61,7 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     // );
     
     _scrollController = ScrollController();
-    _chatController = ChatController();
+    _chatController = widget.chatController ?? ChatController();
     
     // Start fade in animation
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -91,6 +90,19 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     // Listen to chat controller changes
     _chatController.addListener(_onChatControllerChanged);
     
+    // Update conversation title if messages are already loaded (existing conversation)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_chatController.hasMessages) {
+        if (_chatController.currentConversation != null) {
+          setState(() {
+            _conversationTitle = _chatController.currentConversation!.title;
+          });
+        } else {
+          _updateConversationTitle();
+        }
+      }
+    });
+    
     // Check API key when entering chat mode
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!AppConfig.useMockApi) {
@@ -104,7 +116,11 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
       setState(() {
         // Update conversation title when messages exist
         if (_chatController.hasMessages && _conversationTitle == 'Claude Killer') {
-          _updateConversationTitle();
+          if (_chatController.currentConversation != null) {
+            _conversationTitle = _chatController.currentConversation!.title;
+          } else {
+            _updateConversationTitle();
+          }
         }
       });
       
@@ -149,7 +165,12 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
     _scrollController.dispose();
     _textController.dispose();
     _chatController.removeListener(_onChatControllerChanged);
-    _chatController.dispose();
+    
+    // Only dispose ChatController if it was created by this widget
+    if (widget.chatController == null) {
+      _chatController.dispose();
+    }
+    
     super.dispose();
   }
 
@@ -232,14 +253,6 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
         ),
       );
     }
-  }
-
-  void _showSettings() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const SettingsScreen(),
-      ),
-    );
   }
 
   Widget _buildTextInputSection() {
@@ -504,77 +517,24 @@ class _VoiceAssistantUIState extends State<VoiceAssistantUI>
                             ),
 
                             const Spacer(),
-                            Text(
-                              _conversationTitle,
-                              style: GoogleFonts.inter(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF89A8B2),
+                            Expanded(
+                              flex: 3, // Give even more space to the title now
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  _conversationTitle,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF89A8B2),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
                             const Spacer(),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Model switcher button
-                                GestureDetector(
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => MultiModelApiDialog(
-                                        onApiKeysUpdated: () {
-                                          setState(() {}); // Refresh UI
-                                        },
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.white.withOpacity(0.9),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF89A8B2).withOpacity(0.2),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.smart_toy,
-                                      color: Color(0xFF89A8B2),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: _showSettings,
-                                  child: Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.white.withOpacity(0.9),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF89A8B2).withOpacity(0.2),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.settings,
-                                      color: Color(0xFF89A8B2),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ],
                         ),
                       ),

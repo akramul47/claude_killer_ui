@@ -10,6 +10,7 @@ class ChatController extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   
   String? _currentConversationId;
+  Conversation? _currentConversation;
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   String? _error;
@@ -27,6 +28,7 @@ class ChatController extends ChangeNotifier {
   bool get hasMessages => _messages.isNotEmpty;
   bool get isStreaming => _isStreaming;
   String? get currentConversationId => _currentConversationId;
+  Conversation? get currentConversation => _currentConversation;
   ApiModel get currentApiModel => ApiFactory.getCurrentModel();
   ApiService get currentApiService => ApiFactory.getCurrentService();
 
@@ -59,6 +61,9 @@ class ChatController extends ChangeNotifier {
 
   Future<void> startNewConversation() async {
     try {
+      // Clear the current conversation since we're starting a new one
+      _currentConversation = null;
+      
       // Generate a title based on the first message or use a default
       final title = _messages.isNotEmpty 
           ? _generateConversationTitle(_messages.first.text)
@@ -89,6 +94,7 @@ class ChatController extends ChangeNotifier {
       final conversation = await _databaseService.getConversation(conversationId);
       if (conversation != null) {
         _currentConversationId = conversationId;
+        _currentConversation = conversation;
         _messages.clear();
         _messages.addAll(conversation.messages);
         notifyListeners();
@@ -425,6 +431,7 @@ class ChatController extends ChangeNotifier {
 
   void clearCurrentConversation() {
     _currentConversationId = null;
+    _currentConversation = null;
     _messages.clear();
     _setError(null);
     notifyListeners();

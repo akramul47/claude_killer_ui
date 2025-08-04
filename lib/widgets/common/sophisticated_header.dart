@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 import '../../services/greeting_service.dart';
+import '../../screens/settings_screen.dart';
 
 class SophisticatedHeader extends StatelessWidget {
   final AnimationController fadeController;
@@ -81,54 +82,92 @@ class ProfileSection extends StatelessWidget {
     return AnimatedBuilder(
       animation: pulseController,
       builder: (context, child) {
-        return Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.darkBlue,
-                AppColors.mediumBlue,
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.darkBlue.withOpacity(0.3 + pulseController.value * 0.2),
-                blurRadius: 16 + pulseController.value * 8,
-                offset: Offset(0, 4 + pulseController.value * 2),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Profile icon
-              const Center(
-                child: Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              
-              // Online indicator
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Settings button
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
                   ),
+                );
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.9),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.darkBlue.withOpacity(0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.settings,
+                  color: AppColors.darkBlue,
+                  size: 24,
                 ),
               ),
-            ],
-          ),
+            ),
+            
+            // Profile avatar
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.darkBlue,
+                    AppColors.mediumBlue,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.darkBlue.withOpacity(0.3 + pulseController.value * 0.2),
+                    blurRadius: 16 + pulseController.value * 8,
+                    offset: Offset(0, 4 + pulseController.value * 2),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // Profile icon
+                  const Center(
+                    child: Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  
+                  // Online indicator
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
